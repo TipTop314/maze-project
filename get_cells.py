@@ -60,5 +60,6 @@ def get_all_cell_values(testrobot,testmaze):
 def get_visited_cells(testrobot,testmaze):
     cells = [["   " for x in range(testmaze.dim)] for row in range(testmaze.dim)]
     for x in testrobot.next_locations_table:
-        cells[x[0]][x[1]] = " X "
+        if testrobot.next_locations_table[x]:
+            cells[x[0]][x[1]] = " X "
     return cells

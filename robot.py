@@ -55,8 +55,7 @@ class Robot(object):
         for x in [-1, 0]:
             for y in [-1,0]:
                 self.wander_rewards[self.maze_dim/2 + x][self.maze_dim/2 + y] = +10
-                
-        
+                    
     def initialize_tables(self):
         # Initialize utility table with zero in the center
         # and with increasingly negative values as you move
@@ -74,11 +73,13 @@ class Robot(object):
                     dy = self.maze_dim/2 - 1
                 self.U_table[x+dx][y+dy] = (-(abs(x)+abs(y)) + 2)*0.1
         
-        # Large positive reward in the center and negative elsewhere
         self.maze_rewards = np.zeros((self.maze_dim,self.maze_dim))
         for x in range(self.maze_dim):
             for y in range(self.maze_dim):
+                #create rewards
                 self.maze_rewards[x][y] = self.not_center_reward
+                #create next_locations_table
+                self.next_locations_table[(x,y)] = []
         for x in [-1, 0]:
             for y in [-1,0]:
                 self.maze_rewards[self.maze_dim/2 + x][self.maze_dim/2 + y] = self.center_reward
@@ -150,7 +151,7 @@ class Robot(object):
         # If not, then current location is a dead end, either step
         # back in the direction you just came from (with get_backward_location)
         # or, if that direction is also a dead end, step backward one cell
-        if self.current_location in self.next_locations_table:
+        if not self.current_location in self.dead_ends:
             next_locations = list(self.next_locations_table[self.current_location])
         else:
             next_locations = self.get_backward_locations()
@@ -267,7 +268,7 @@ class Robot(object):
             for next_location in self.next_locations_table[location]:
                if next_location == self.current_location:
                     self.next_locations_table[location].remove(next_location)
-        del self.next_locations_table[self.current_location]
+        #del self.next_locations_table[self.current_location]
         
     def next_move(self, sensors):
         
@@ -299,6 +300,8 @@ class Robot(object):
         #self.epsilon = pow(0.99999,self.move_count)
 
         return rotation, movement
+    
+    # OLD CODE
     
     def wander_setup(self):
     
