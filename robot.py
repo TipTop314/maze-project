@@ -4,14 +4,11 @@ import random
 class Robot(object):
     
     # INITIALIZE ROBOT
-    #def __init__(self, maze_dim, start_location, start_heading):
     def __init__(self, maze_dim):
         
         # Robot constants
         self.maze_dim = maze_dim
         self.maze_reward = -10
-        self.goals = []
-        
         self.threshold = self.maze_dim/2
         
         # Mapping of robot's local coordinate system to global maze coordinate system
@@ -26,37 +23,29 @@ class Robot(object):
         # Present info
         self.move_count = 0
         self.current_location = (0,0)
+        self.new_goal = (0,0)
         self.heading = "u"
         self.found_goal = False
         self.finished_exploring = False
+        self.found_loneliest_loc = False
         self.run = 1
         
         # Memory
         self.U_table_to_goal = np.zeros((self.maze_dim,self.maze_dim))
-        self.U_table_to_start = np.zeros((self.maze_dim,self.maze_dim))
+        self.U_table_exploration = np.zeros((self.maze_dim,self.maze_dim))
         self.times_visited = np.zeros((self.maze_dim,self.maze_dim))
+        self.loneliness_mat = np.zeros((self.maze_dim,self.maze_dim))
         self.path_taken = [self.current_location]
         self.heading_history = [self.heading]
         self.path_taken_to_goal = [self.current_location]
         self.path_taken_to_start = []
-        self.next_locations_table = dict()
+        self.next_locations_table = {(row,col):[] for row in range(self.maze_dim) 
+                                                for col in range (self.maze_dim)}
         self.dead_ends = []
         self.best_path = []
         self.goal = 0
         
-        ##TEMP###
-        self.loneliness_mat = np.zeros((self.maze_dim,self.maze_dim))
-        self.u_table_temp = np.zeros((self.maze_dim,self.maze_dim))
-        self.goal_temp = (0,0)
-        self.found_loneliest_loc = False
-        
-        # Create tables and list
-        self.initialize_tables()
-    
-    def initialize_tables(self):
-        
         # Cell utilities for heading to goal from start
-        
         for x in [i for i in range(-self.maze_dim/2,self.maze_dim/2+1) if i != 0]:
             for y in [j for j in range(-self.maze_dim/2,self.maze_dim/2+1) if j != 0]:
                 if x < 0: 
@@ -67,21 +56,7 @@ class Robot(object):
                     dy = self.maze_dim/2
                 else:
                     dy = self.maze_dim/2 - 1
-                #self.U_table_to_goal[x+dx][y+dy] = (-(abs(x)**2+abs(y)**2)**0.5)
                 self.U_table_to_goal[x+dx][y+dy] = (-(abs(x)+abs(y)))+2
-        
-        # Cell utilities for heading to start from goal
-        for x in range(self.maze_dim):
-            for y in range(self.maze_dim):
-                #create next_locations_table
-                self.next_locations_table[(x,y)] = []
-                #create utility table for heading back to start of maze
-                self.U_table_to_start[(x,y)] = (-x-y)*0.1
-        
-        # Save goal locations for later
-        for x in [-1, 0]:
-            for y in [-1,0]:
-                self.goals.append((self.maze_dim/2 + x,self.maze_dim/2 + y))
 
     # HELPER FUNCTIONS
     def get_visible_next_locations(self,sensors):
@@ -128,38 +103,6 @@ class Robot(object):
             self.heading = action_dir
 
         return rotation, movement
-      
-    def get_backward_locations(self, next_locations):
-        
-        #if self.move_count > 0: 
-        backward_locations = []
-        if len(self.path_taken) > 1:
-            
-            n_steps = 0
-            current_location = np.array(self.current_location)
-            last_location = np.array(self.path_taken[-2])
-            # Get the steps and direction of the last move taken
-            last_move = current_location - last_location
-            #(remove this) if not sum(last_move)==0:
-            last_move_dir = last_move / np.linalg.norm(last_move)
-                
-            # If last move was a forward step, we can step backward that many steps
-            if np.array_equal(last_move_dir,self.dir_move[self.heading]):
-                n_steps = abs(sum(last_move))
-                dir_bwd_steps = np.array(self.dir_move[self.dir_reverse[self.heading]])
-                # Convert number of backward steps to list of locations
-                for x in range(1,n_steps+1):
-                    backward_locations.append(tuple((current_location + x*dir_bwd_steps)))
-            # In the case where we were at a dead end, stepped back one step and once
-            # again see no available moves (the cell in front of us has been removed 
-            # from the list because it's a dead end) then step back a single cell.
-            elif not next_locations:
-                bwd_step = np.array(self.dir_move[self.dir_reverse[self.heading]])
-                current_location = np.array(self.current_location)
-                backward_locations = [tuple(current_location + bwd_step)]    
-            return backward_locations
-        else:
-            return backward_locations
         
     def update_next_locations_table(self,visible_next_locations):
         
@@ -175,10 +118,6 @@ class Robot(object):
         # consider this cell a dead end also
         if not locations_to_add and self.current_location != (0,0):
             self.remove_dead_end()
-        
-        
-        # Add available locations behind us to list
-        locations_to_add += self.get_backward_locations(locations_to_add)
 
         # Add current location to list
         locations_to_add.append(self.current_location)
@@ -192,12 +131,7 @@ class Robot(object):
                             new_locations_to_add.remove(new_loc)
             # Add new locations to next_locations_table
             self.next_locations_table[base_loc] += new_locations_to_add
-        
-        ###TEMP###
-        #locations_to_add.remove(self.current_location)
-        #add_to_table(locations_to_add, self.current_location)
-        ##########
-        
+
         # Split list into locations along up-down an left-right directions
         up_down_loc = [loc for loc in locations_to_add if loc[0]==self.current_location[0]]
         left_right_loc = [loc for loc in locations_to_add if loc[1]==self.current_location[1]]
@@ -246,14 +180,13 @@ class Robot(object):
                     loneliest_loc = (row,col)
         return loneliest_loc
     
-    def update_u_table_temp(self,cell):
+    def update_U_table_exploration(self,cell):
         for row in range(self.maze_dim):
             for col in range(self.maze_dim):
                 if not (row == cell[0] and col == cell[1]):
-                    self.u_table_temp[row][col] = -0.1*(abs(row - cell[0]) + abs(col - cell[1]))
+                    self.U_table_exploration[row][col] = -0.1*(abs(row - cell[0]) + abs(col - cell[1]))
                     
-    # THE EXPLORERS
-    
+    # THE EXPLORERS  
     def directed_explorer_of_the_unknown(self):
         
         next_locations = list(self.next_locations_table[self.current_location])
@@ -291,93 +224,8 @@ class Robot(object):
                 min_visited_locations.append(location)
                 
         return random.choice(min_visited_locations) 
-     
+
     def the_curious(self):
-        
-        next_locations = list(self.next_locations_table[self.current_location])
-        
-        # Remove goal locations from choices
-        copy_next_locations = list(next_locations)
-        goal_bounds = [self.maze_dim/2 - 1, self.maze_dim/2]
-        for location in next_locations:
-            if location[0] in goal_bounds and location[1] in goal_bounds:
-                copy_next_locations.remove(location)
-        next_locations = copy_next_locations
-        
-        min_visited = 100
-        for location in next_locations:
-            if self.times_visited[location] < min_visited:
-                min_visited = self.times_visited[location]
-        
-        min_visited_locations = []
-        for location in next_locations:
-            if self.times_visited[location] == min_visited:
-                min_visited_locations.append(location)
-                
-        # Find largest utility value
-        maxU = -100000
-        for location in min_visited_locations:
-            if self.U_table_to_start[location] > maxU:
-                maxU = self.U_table_to_start[location]
-
-        # Make list of all next locations with maxU and choose one
-        maxU_locations = []
-        for location in min_visited_locations:
-            if self.U_table_to_start[location] == maxU:
-                maxU_locations.append(location)
-        next_location = random.choice(maxU_locations)
-        
-        # If next_location is back at start, finish exploring
-        if next_location[0] == 0 and next_location[1] == 0:
-            self.finished_exploring = True
-        
-        # Add maze reward to utility table to track I've been here
-        self.U_table_to_start[self.current_location] += self.maze_reward
-        
-        return next_location
-
-     
-    def the_reasonably_curious(self):
-        
-        next_locations = list(self.next_locations_table[self.current_location])
-        
-        if len(self.path_taken_to_start) > self.threshold:
-            for seen_loc in self.path_taken_to_goal:
-                if self.current_location[0] == seen_loc[0] and self.current_location[1] == seen_loc[1]:
-                    self.finished_exploring = True
-                    return
-        
-        # If you can see the start, end.
-        if (0,0) in next_locations:
-            self.finished_exploring = True
-            return 
-        
-        # Remove goal locations from choices
-        copy_next_locations = list(next_locations)
-        goal_bounds = [self.maze_dim/2 - 1, self.maze_dim/2]
-        for location in next_locations:
-            if location[0] in goal_bounds and location[1] in goal_bounds:
-                copy_next_locations.remove(location)
-        next_locations = copy_next_locations
-                
-        # Of the locations left, choose the one with max utility
-        maxU = -100000
-        for location in next_locations:
-            if self.U_table_to_start[location] > maxU:
-                maxU = self.U_table_to_start[location]
-        maxU_locations = []
-        for location in next_locations:
-            if self.U_table_to_start[location] == maxU:
-                maxU_locations.append(location)
-        next_location = random.choice(maxU_locations)
-        
-        # Add maze reward to utility table to track I've been here
-        self.U_table_to_start[self.current_location] += self.maze_reward
-        
-        self.path_taken_to_start.append(next_location)
-        return next_location
-
-    def the_directed_curious(self):
         
         next_locations = list(self.next_locations_table[self.current_location])
         
@@ -388,11 +236,9 @@ class Robot(object):
                     return
         
         # If you can see the loneliest location
-        if self.goal_temp in next_locations and not self.found_loneliest_loc:
-            self.u_table_temp = self.U_table_to_start
+        if self.new_goal in next_locations and not self.found_loneliest_loc:
+            self.update_U_table_exploration((0,0))
             self.found_loneliest_loc = True
-            #for location in self.path_taken_to_start:
-            #    self.u_table_temp[location] += self.maze_reward
         
         if (0,0) in next_locations:
             self.finished_exploring = True
@@ -409,16 +255,16 @@ class Robot(object):
         # Of the locations left, choose the one with max utility
         maxU = -100000
         for location in next_locations:
-            if self.u_table_temp[location] > maxU:
-                maxU = self.u_table_temp[location]
+            if self.U_table_exploration[location] > maxU:
+                maxU = self.U_table_exploration[location]
         maxU_locations = []
         for location in next_locations:
-            if self.u_table_temp[location] == maxU:
+            if self.U_table_exploration[location] == maxU:
                 maxU_locations.append(location)
         next_location = random.choice(maxU_locations)
         
         # Add maze reward to utility table to track I've been here
-        self.u_table_temp[self.current_location] += self.maze_reward
+        self.U_table_exploration[self.current_location] += self.maze_reward
         
         self.path_taken_to_start.append(next_location)
         return next_location
@@ -505,14 +351,9 @@ class Robot(object):
                 self.goal = self.current_location
                 self.path_taken_to_goal = list(self.path_taken)
                 self.best_path = self.a_star((0,0),self.goal,self.next_locations_table,self.maze_dim)
-                # # Add negative reward to previously explored locations
-                # for r,row in enumerate(self.times_visited):
-                    # for c,col in enumerate(row):
-                        # if col > 0:
-                            # self.U_table_to_start[r][c] += self.maze_reward/2
-                # prep for directed curious
-                self.goal_temp = self.get_loneliest_loc()
-                self.update_u_table_temp(self.goal_temp)
+                # Prep for The Curious
+                self.new_goal = self.get_loneliest_loc()
+                self.update_U_table_exploration(self.new_goal)
             
             # Get valid next locations
             visible_next_locations = self.get_visible_next_locations(sensors)
@@ -530,26 +371,16 @@ class Robot(object):
                 # Heads towards the unexplored, ignorant of where the center is
                 #next_location = self.explorer_of_the_unknown()
 
-                # THE DIRECTED EXPLORER OF THE UNKNOWN
+                # THE DIRECTED EXPLORER
                 # Heads towards centre and prefers less explored areas
                 next_location = self.directed_explorer_of_the_unknown()
             
             else:
                 
-                # THE CURIOUS EXPLORER
-                # After finding goal, continues exploring for an alternate path
-                #next_location = self.the_curious()
-                #self.path_taken_to_start.append(next_location)
-                
-                # THE REASONABLY CURIOUS EXPLORER
-                # After finding goal, continues exploring for an alternate path
-                #next_location = self.the_reasonably_curious()
-                
                 # THE DIRECTED CURIOUS
-                next_location = self.the_directed_curious()
+                next_location = self.the_curious()
                 
                 # THE IMPATIENT EXPLORER
-                # is happy to be out of the maze and go to bed
                 #self.finished_exploring = True
             
             if self.finished_exploring:
