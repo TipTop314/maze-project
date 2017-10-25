@@ -10,3 +10,10 @@ robot.py
   - The Curious Explorer
 - To run a test or a set of trials (using the AI_mouse_project notebook) for a specific explorer, you'll need to edit this file. The lines you'll need to comment/uncomment are in the next_move function. Uncomment the line starting with next_location under the explorers name to turn it on. Make sure all the other explorers which you aren't testing are commented out. You need to have at least one of the explorers under "if not self.found_goal" turned on. Just below that, there's also the option to turn on The Curious Explorer which will continue exploration after finding the goal, or keep that off and turn on "self.finished_exploring = True" to end the first run once the goal is found.
 
+visualizations.py
+- contains all the scripts I created for visualizing the maze in different ways.
+
+take_n_steps.py
+- some code I used in conjunction with the AI_mouse_project notebook for running the robot through the maze
+
+Libraries used for this project: numpy, pandas, matplotlib, random
