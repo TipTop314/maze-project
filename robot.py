@@ -361,11 +361,8 @@ class Robot(object):
             # Get all valid next locations
             self.update_next_locations_table(visible_next_locations)
 
+            # This 
             if not self.found_goal:
-                
-                # THE FOOL
-                # chooses where to go randomly
-                #next_location = random.choice(list(self.next_locations_table[self.current_location]))
                 
                 # THE EXPLORER OF THE UNKNOWN
                 # Heads towards the unexplored, ignorant of where the center is
@@ -377,11 +374,11 @@ class Robot(object):
             
             else:
                 
-                # THE DIRECTED CURIOUS
-                next_location = self.the_curious()
+                # THE CURIOUS EXPLORER
+                #next_location = self.the_curious()
                 
-                # THE IMPATIENT EXPLORER
-                #self.finished_exploring = True
+                # NO EXPLORATION AFTER GOAL
+                self.finished_exploring = True
             
             if self.finished_exploring:
                 rotation, movement = ('Reset','Reset')

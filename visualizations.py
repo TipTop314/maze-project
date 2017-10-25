@@ -1,3 +1,4 @@
+import numpy as np
 
 def print_maze(maze,cells):
     
@@ -79,7 +80,22 @@ def print_maze(maze,cells):
         else:
             newline += "    " 
     print(newline)
-    
+
+
+def show_step_count(maze,path):
+    cells = [["   " for x in range(maze.dim)] for row in range(maze.dim)]
+    #symbol = (x for x in [" X "," O "," "])
+    for i,x in enumerate(path):
+        if i < 10: 
+            cells[x[0]][x[1]] = " {} ".format(i)
+        elif i < 100:
+            cells[x[0]][x[1]] = " {}".format(i)
+        else:
+            cells[x[0]][x[1]] = "{}".format(i)
+    steps = len(path)-1
+    print("steps:{}").format(steps)
+    print_maze(maze,cells)
+
 def show_multiple_path(maze,paths):
     cells = [["   " for x in range(maze.dim)] for row in range(maze.dim)]
     #symbol = (x for x in [" X "," O "," "])
@@ -89,7 +105,8 @@ def show_multiple_path(maze,paths):
                 cells[x[0]][x[1]] = " {} ".format(i)
             else:
                 cells[x[0]][x[1]] = cells[x[0]][x[1]][:2] + str(i)
-    print("steps:{}").format(len(path))
+    steps = np.sum([len(x) for x in paths])-1
+    print("steps:{}").format(steps)
     print_maze(maze,cells)
     
 def show_times_visited(maze,path):
@@ -103,4 +120,3 @@ def show_times_visited(maze,path):
         
     print("steps:{}").format(len(path))
     print_maze(maze,cells)
-    
